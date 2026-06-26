@@ -1,28 +1,40 @@
-# algorithms/base.py
+"""
+Abstract base class for all pathfinding algorithms.
+
+To add a new algorithm (Dijkstra, BFS, JPS, etc.):
+  1. Subclass PathfindingAlgorithm
+  2. Implement find_path()
+  3. Set the `name` class attribute
+The UI and visualization layer picks it up automatically.
+"""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
-import networkx as nx
+
 
 @dataclass
 class SearchResult:
-    path: list[int]           # ordered list of node IDs
-    explored: list[int]       # nodes visited in exploration order (for animation)
-    path_length_m: float      # total path length in metres
-    nodes_explored: int
-    runtime_ms: float
+    """Everything a pathfinding run produces."""
+    path: list[int]            # node IDs from origin to destination
+    explored: list[int]        # nodes popped from open set, in order (for animation)
+    path_length_m: float       # sum of edge lengths in metres
+    nodes_explored: int        # len(explored), kept separate for clarity
+    runtime_ms: float          # wall-clock time of find_path()
+
 
 class PathfindingAlgorithm(ABC):
-    """Abstract base for all pathfinding algorithms.
-    
-    To add a new algorithm:
-    1. Subclass this
-    2. Implement find_path()
-    3. Register in AlgorithmRegistry
-    That's it — the UI picks it up automatically.
+    """
+    All algorithms receive a graph.builder.RoadGraph and return a SearchResult.
+
+    The interface is intentionally narrow — algorithms must not call OSMnx,
+    touch Streamlit, or write to disk.
     """
 
-    def __init__(self, graph: nx.MultiDiGraph):
+    name: str = ""  # subclasses set this as a class attribute
+
+    def __init__(self, graph):
+        # Accepts graph.builder.RoadGraph — typed loosely to avoid
+        # circular imports; both layers stay decoupled.
         self.graph = graph
 
     @abstractmethod
@@ -30,19 +42,22 @@ class PathfindingAlgorithm(ABC):
         self,
         origin_node: int,
         destination_node: int,
-    ) -> Optional[SearchResult]:
-        """Find shortest path. Return None if no path exists."""
+    ) -> SearchResult | None:
+        """
+        Find the shortest path between two node IDs.
+
+        Returns SearchResult on success, None if no path exists.
+        """
         ...
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Human-readable algorithm name for UI display."""
-        ...
+    # ------------------------------------------------------------------ #
+    # Shared helpers — subclasses may use these                           #
+    # ------------------------------------------------------------------ #
 
     def _reconstruct_path(
         self, came_from: dict[int, int], current: int
     ) -> list[int]:
+        """Walk came_from pointers back to origin."""
         path = [current]
         while current in came_from:
             current = came_from[current]
@@ -50,28 +65,9 @@ class PathfindingAlgorithm(ABC):
         return list(reversed(path))
 
     def _path_length_m(self, path: list[int]) -> float:
+        """Sum edge lengths along a node-ID path."""
         total = 0.0
         for u, v in zip(path, path[1:]):
-            edge_data = self.graph.get_edge_data(u, v)
-            # MultiDiGraph can have parallel edges; take the shortest
-            lengths = [d.get('length', 0) for d in edge_data.values()]
-            total += min(lengths)
+            neighbors = dict(self.graph.get_neighbors(u))
+            total += neighbors.get(v, 0.0)
         return total
-
-
-# Simple registry so the UI can list available algorithms
-class AlgorithmRegistry:
-    _registry: dict[str, type[PathfindingAlgorithm]] = {}
-
-    @classmethod
-    def register(cls, algorithm_cls: type[PathfindingAlgorithm]):
-        cls._registry[algorithm_cls.name.fget(None)] = algorithm_cls  # type: ignore
-        return algorithm_cls
-
-    @classmethod
-    def get(cls, name: str) -> type[PathfindingAlgorithm]:
-        return cls._registry[name]
-
-    @classmethod
-    def available(cls) -> list[str]:
-        return list(cls._registry.keys())
