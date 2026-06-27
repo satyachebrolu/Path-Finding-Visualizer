@@ -1,4 +1,53 @@
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
 venv/
+.venv/
+env/
+.env/
+
+# OSMnx cache and generated data files
+data/*.graphml
+data/*.html
+data/*.png
+data/*.osm
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Temp files created during tile download
+*.osm.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Logs
+*.log
+
+# Keep the data directory but not its contents
+data/.gitkeep
+assets/.gitkeep
